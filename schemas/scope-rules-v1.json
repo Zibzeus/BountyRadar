@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BountyRadar Scope Rules v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "acquired_at",
+    "url",
+    "rules",
+    "ambiguities"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "rules": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "raw",
+          "kind",
+          "value",
+          "effect"
+        ],
+        "properties": {
+          "raw": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "include",
+              "exclude",
+              "unknown"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

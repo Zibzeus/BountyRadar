@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BountyRadar Program Metadata v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "acquired_at",
+    "provenance",
+    "verification",
+    "url",
+    "platform",
+    "name",
+    "ambiguities"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "acquired_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_verified_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "platform": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "ambiguities": {
+      "type": "array"
+    },
+    "verification": {
+      "enum": [
+        "official",
+        "manual",
+        "secondary"
+      ]
+    },
+    "provenance": {
+      "type": "object"
+    }
+  }
+}

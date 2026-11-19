@@ -1,0 +1,88 @@
+name: bountyradar
+x-app: &app
+  build: .
+  image: bountyradar:local
+  restart: unless-stopped
+  environment: &env
+    DATABASE_URL: postgresql+psycopg://radar:${RADAR_DB_PASSWORD:?run setup}@db/radar
+    REDIS_URL: redis://redis:6379/0
+    RADAR_MASTER_KEY_FILE: /run/secrets/master
+    COOKIE_SECURE: ${COOKIE_SECURE:-0}
+    BOUNTYRADAR_PRIVATE_ORIGINS: ${BOUNTYRADAR_PRIVATE_ORIGINS:-http://agent-reach:8787}
+    BOUNTYRADAR_APPROVED_POLICY_URLS: ${BOUNTYRADAR_APPROVED_POLICY_URLS:-}
+  secrets: [master]
+  depends_on:
+    db: {condition: service_healthy}
+    redis: {condition: service_healthy}
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_DB: radar
+      POSTGRES_PASSWORD: ${RADAR_DB_PASSWORD:?run setup}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U radar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes: [queue:/data]
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    <<: *app
+    environment:
+      <<: *env
+      RADAR_ADMIN_PASSWORD_FILE: /run/secrets/admin
+    secrets: [master,admin]
+    command: ["sh","-ec","alembic upgrade head && exec uvicorn radar.app:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2)"]
+      interval: 8s
+      timeout: 4s
+      retries: 15
+  worker:
+    <<: *app
+    depends_on:
+      api: {condition: service_healthy}
+    command: ["celery","-A","radar.work:celery","worker","-l","INFO","--concurrency","2"]
+  scheduler:
+    <<: *app
+    depends_on:
+      api: {condition: service_healthy}
+    command: ["celery","-A","radar.work:celery","beat","-l","INFO","--schedule","/tmp/radar-beat"]
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    ports: ["127.0.0.1:${RADAR_PORT:-8098}:8080"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro"]
+  agent-reach:
+    profiles: [research]
+    build: ./agent-reach
+    environment:
+      BOUNTYRADAR_REACH_TOKEN_FILE: /run/secrets/reach
+      BOUNTYRADAR_APPROVED_POLICY_URLS: ${BOUNTYRADAR_APPROVED_POLICY_URLS:-}
+    secrets: [reach]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  pgdata: {}
+  queue: {}
+secrets:
+  master: {file: ./secrets/master}
+  admin: {file: ./secrets/admin}
+  reach: {file: ./secrets/reach}
+
